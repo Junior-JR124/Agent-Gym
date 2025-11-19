@@ -872,10 +872,14 @@ class BabyAIEnv:
             return {"error": str(e)}
 
 
-    def reset(self, idx: int, data_idx: int):
+    def reset(self, idx: int, data_idx: int, seed: int = None):
         try:
             self._check_id(idx, True)
-            self.env[idx] = BabyAI(game_name=all_levels[data_idx % 40 + 1], seed=data_idx // 40)
+            # Use provided seed if available, otherwise use data_idx based seed
+            if seed is None:
+                seed = data_idx // 40
+            
+            self.env[idx] = BabyAI(game_name=all_levels[data_idx % 40 + 1], seed=seed)
             self.env[idx].reset()
             action_space = "\nAvailable actions: ["
             for action in self.env[idx]._get_action_space():

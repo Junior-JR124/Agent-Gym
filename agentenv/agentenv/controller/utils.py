@@ -1,11 +1,10 @@
 import json
 import re
-from typing import Optional, Sequence
+from typing import Optional, Sequence, List, Tuple, Dict, Union
 
 import numpy as np
-from transformers import GenerationConfig
 
-from . import Agent, APIAgent, BaseTask
+from . import APIAgent, BaseTask
 from .types import (
     ActionFormat,
     ActionWithTought,
@@ -110,8 +109,8 @@ def extract_python_code_blocks(text: str) -> str:
 
 
 class BaseAdapter:
-    conversation_start_dict: dict[
-        ActionFormat, tuple[ConversationMessage, ConversationMessage]
+    conversation_start_dict: Dict[
+        ActionFormat, Tuple[ConversationMessage, ConversationMessage]
     ]
 
     @staticmethod
@@ -205,16 +204,16 @@ class BaseAdapter:
 
 
 class BaseAgentEnvController:
-    def __init__(self, agent: Agent | APIAgent, tasks: Sequence[BaseTask]) -> None:
+    def __init__(self, agent: APIAgent, tasks: Sequence[BaseTask]) -> None:
         self.agent = agent
         self.tasks = tasks
 
     def generate_experience(
         self,
-        idxs: Sequence[int] | Sequence[Sequence[int]] | None = None,
-        generation_config: Optional[GenerationConfig] = None,
+        idxs: Optional[Union[Sequence[int], Sequence[Sequence[int]]]] = None,
+        generation_config = None,
         max_rounds: Optional[int] = None,
-    ) -> list[ExperienceOutput | APIExperienceOutput]:
+    ) -> List[Union[ExperienceOutput, APIExperienceOutput]]:
         experience = []
         if isinstance(idxs[0], int):
             experience += self.tasks[0].generate_experience(
@@ -240,9 +239,9 @@ class BaseAgentEnvController:
 class Evaluator(BaseAgentEnvController):
     def eval(
         self,
-        generation_config: Optional[GenerationConfig] = None,
+        generation_config = None,
         max_rounds: Optional[int] = None,
-        idxs: Sequence[int] | Sequence[Sequence[int]] | None = None,
+        idxs: Optional[Union[Sequence[int], Sequence[Sequence[int]]]] = None,
     ) -> EvaluationOutput:
         exps = self.generate_experience(
             idxs=(
@@ -253,9 +252,18 @@ class Evaluator(BaseAgentEnvController):
             generation_config=generation_config,
             max_rounds=max_rounds,
         )
-        rewards = np.array([exp.reward for exp in exps])
+        rewards = np.array([exp.reward for exp in exps], dtype=float)
+        if rewards.size:
+            success_mask = np.isclose(rewards, 1.0) | np.isclose(rewards, 100.0)
+            success = float(success_mask.mean())
+            score = float(rewards.mean())
+        else:
+            success = 0.0
+            score = 0.0
         return EvaluationOutput(
-            experiences=exps, score=rewards.mean(), success=(rewards == 1 or rewards == 100).mean()
+            experiences=exps,
+            score=score,
+            success=success,
         )
 
 
@@ -268,18 +276,27 @@ class BaseTrainer(BaseAgentEnvController):
 
     def eval(
         self,
-        generation_config: Optional[GenerationConfig] = None,
+        generation_config = None,
         max_rounds: Optional[int] = None,
-        idxs: Sequence[int] | Sequence[Sequence[int]] = None,
+        idxs: Optional[Union[Sequence[int], Sequence[Sequence[int]]]] = None
     ) -> EvaluationOutput:
         exps = self.generate_experience(
             idxs=idxs,
             generation_config=generation_config,
             max_rounds=max_rounds,
         )
-        rewards = np.array([exp.reward for exp in exps])
+        rewards = np.array([exp.reward for exp in exps], dtype=float)
+        if rewards.size:
+            success_mask = np.isclose(rewards, 1.0) | np.isclose(rewards, 100.0)
+            success = float(success_mask.mean())
+            score = float(rewards.mean())
+        else:
+            success = 0.0
+            score = 0.0
         return EvaluationOutput(
-            experiences=exps, score=rewards.mean(), success=(rewards == 1 or rewards == 100).mean()
+            experiences=exps,
+            score=score,
+            success=success,
         )
 
     def save_model(self):

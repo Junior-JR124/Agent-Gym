@@ -29,11 +29,16 @@ def load_docs(corpus, doc_idxs):
     return results
 
 def load_model(model_path: str, use_fp16: bool = False):
+    import torch
     model_config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
     model = AutoModel.from_pretrained(model_path, trust_remote_code=True)
     model.eval()
-    model.cuda()
-    if use_fp16: 
+    
+    # Auto-detect device: use GPU if available, otherwise CPU
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    
+    if use_fp16 and torch.cuda.is_available():
         model = model.half()
     tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, trust_remote_code=True)
     return model, tokenizer

@@ -29,3 +29,10 @@ class StateResponse(BaseModel):
 class ResetQuery(BaseModel):
     env_idx: int
     session_id: Optional[int] = None
+
+class CloseRequestBody(BaseModel):
+    env_idx: int
+
+
+class CreateQuery(BaseModel):
+    seed: Optional[int] = None

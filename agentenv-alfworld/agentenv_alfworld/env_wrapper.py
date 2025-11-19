@@ -86,10 +86,30 @@ class ALFWorld_Wrapper:
             payload = {"error": f"{e}"}
         return payload
     
+    
     def __del__(self):
         for idx in self.ls:
             self.env_init[idx].close()
             print(f"-------Env {idx} closed--------")
+
+    def close(self, idx):
+        try:
+            self._check_id(idx)
+            if idx in self.env_init:
+                self.env_init[idx].close()
+                del self.env_init[idx]
+            if idx in self.env:
+                del self.env[idx]
+            if idx in self.info:
+                del self.info[idx]
+            if idx in self.ls:
+                self.ls.remove(idx)
+            print(f"-------Env {idx} closed--------")
+            payload = {"id": idx, "status": "closed"}
+        except Exception as e:
+            payload = {"error": f"{e}"}
+        return payload
+
 
     def step(self, idx: int, action: str):
         try:
@@ -162,10 +182,8 @@ class ALFWorld_Wrapper:
 
     def _check_id(self, idx: int, is_reset: bool = False):
         if idx not in self.info:
-            raise NameError(f"The id {idx} is not valid.")
-        if self.info[idx]["deleted"]:
-            raise NameError(f"The task with environment {idx} has been deleted.")
-        if not is_reset and self.info[idx]["done"]:
+            raise NameError(f"The id {idx} is not valid or has been deleted.")
+        if not is_reset and self.info[idx].get("done", False):
             print("is reset", is_reset)
             print("done", self.info[idx]["done"])
             raise NameError(f"The task with environment {idx} has finished.")

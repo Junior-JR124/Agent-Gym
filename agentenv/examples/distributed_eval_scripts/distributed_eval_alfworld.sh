@@ -1,5 +1,5 @@
 exp_name="eval_alfworld"
-inference_file='alfworld_test.json' # Path to the trainset file which contains idxs for the task.
+inference_file='' # Path to the trainset file which contains idxs for the task.
 
 num_processes='8'
 main_process_port='8877'
@@ -7,11 +7,11 @@ weight_decay="0"
 
 ### Default variables
 task_name="alfworld" # change this to evaluate on a different task
-output_dir="output"
-config_file="config.yaml"
+output_dir=""
+config_file=""
 
 # agent model
-model_path="bluecolor/Affine_tiny_l_full_norea"
+model_path=""
 
 eval_batch_size="1"
 num_workers="8"

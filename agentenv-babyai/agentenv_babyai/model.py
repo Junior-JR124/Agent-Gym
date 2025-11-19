@@ -10,6 +10,7 @@ class StepRequestBody(BaseModel):
 class ResetRequestBody(BaseModel):
     id: int
     data_idx: int
+    seed: Optional[int] = None
 
 class CloseRequestBody(BaseModel):
     id: int

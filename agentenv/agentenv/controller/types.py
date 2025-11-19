@@ -40,17 +40,17 @@ class StepOutput:
 
 @dataclass
 class ExperienceOutput:
-    conversation: list[ConversationMessage]
+    conversation: List[ConversationMessage]
     reward: float
     text: str
-    seq_ids: list[int]
-    attention_mask: list[int]
-    action_mask: list[int]
+    seq_ids: List[int]
+    attention_mask: List[int]
+    action_mask: List[int]
 
 
 @dataclass
 class APIExperienceOutput:
-    conversation: list[ConversationMessage]
+    conversation: List[ConversationMessage]
     reward: float
 
 
@@ -62,7 +62,7 @@ class ActionWithTought:
 
 @dataclass
 class EvaluationOutput:
-    experiences: list[ExperienceOutput]
+    experiences: List[ExperienceOutput]
     score: float
     success: float
 

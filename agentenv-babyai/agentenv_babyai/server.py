@@ -34,7 +34,7 @@ def step(body: StepRequestBody):
 
 @app.post("/reset")
 def reset(body: ResetRequestBody):
-    return server.reset(body.id, body.data_idx)
+    return server.reset(body.id, body.data_idx, body.seed)
 
 @app.get("/observation")
 def get_observation(id: int):

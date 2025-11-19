@@ -25,6 +25,9 @@ async def reset(body: ResetRequestBody):
     print("body", body)
     return server.reset(body.id, body.game, body.world_type)
 
+@app.post("/close")
+async def reset(body: CloseRequestBody):
+    return server.close(body.id)
 
 @app.get("/available_actions")
 def get_available_actions(id: int):

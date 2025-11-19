@@ -164,8 +164,12 @@ class SciWorldEnv:
         if self.info[idx]["deleted"]:
             raise ValueError(f"The task with environment {idx} has been deleted.")
         self.env[idx].close()
-        self.info[idx]["deleted"]=True
-        self.ls.remove(idx)
+        if idx in self.env:
+            del self.env[idx]
+        if idx in self.info:
+            del self.info[idx]
+        if idx in self.ls:
+            self.ls.remove(idx)
         print(f"-------Env {idx} closed--------")
         return True
     # Below ONLY used in visualization mode

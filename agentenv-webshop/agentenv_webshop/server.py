@@ -16,7 +16,6 @@ app = FastAPI(debug=debug_flg)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
 
-# 自定义中间件
 @app.middleware("http")
 async def log_request_response_time(request: Request, call_next):
     start_time = time.time()
@@ -41,9 +40,12 @@ async def list_envs():
 
 
 @app.post("/create", response_model=int)
-async def create():
+async def create(create_query: CreateQuery = None):
     """Create a new environment"""
-    env = webshop_env_server.create()
+    seed = None
+    if create_query is not None:
+        seed = create_query.seed
+    env = webshop_env_server.create(seed=seed)
 
     return env
 
@@ -101,3 +103,7 @@ def get_state(env_idx: int):
 def reset(reset_query: ResetQuery):
     print(reset_query)
     return webshop_env_server.reset(reset_query.env_idx, reset_query.session_id)
+
+@app.post("/close")
+def close(body: CloseRequestBody):
+    return webshop_env_server.close(body.env_idx)
