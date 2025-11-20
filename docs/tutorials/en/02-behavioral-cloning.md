@@ -16,24 +16,24 @@ AgentGYM gives the split of the train and test set. You can get the dataset from
         "item_id": "webshop_0",
         "conversations": [
             {
-                "from": "human",
+                "role": "user",
                 "loss": null,
-                "value": "Description of the task"
+                "content": "Description of the task"
             },
             {
-                "from": "gpt",
+                "role": "assistant",
                 "loss": false,
-                "value": "Ok."
+                "content": "Ok."
             },
             {
-                "from": "human",
+                "role": "user",
                 "loss": null,
-                "value": "Observation from the environment."
+                "content": "Observation from the environment."
             },
             {
-                "from": "gpt",
+                "role": "assistant",
                 "loss": true,
-                "value": "Thought: ...\n\nAction: ..."
+                "content": "Thought: ...\n\nAction: ..."
             },
             ...
         ],

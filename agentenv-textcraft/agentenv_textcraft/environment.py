@@ -191,7 +191,7 @@ class TextCraftEnv(gym.Env[str, str]):
             {},
         )
 
-    def render(self, mode="human"):
+    def render(self, mode="user"):
         pass
 
     def close(self):

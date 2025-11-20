@@ -12,7 +12,6 @@ import torch
 import wandb
 from accelerate import Accelerator, InitProcessGroupKwargs
 from accelerate.utils import broadcast, gather_object
-from agentenv.controller import Agent
 from agentenv.controller.agent import Agent
 from agentenv.controller.task import BaseTask
 from agentenv.controller.utils import BaseTrainer
@@ -20,8 +19,9 @@ from agentenv.trainer.utils import set_seed
 from datasets import Dataset, DatasetDict
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import AdamW, GenerationConfig, get_linear_schedule_with_warmup
-from peft import LoraConfig, get_peft_model, TaskType, save_peft_model
+from torch.optim import AdamW
+from transformers import GenerationConfig, get_linear_schedule_with_warmup
+from peft import LoraConfig, get_peft_model, TaskType
 
 
 class BCTrainer(BaseTrainer):
@@ -48,7 +48,7 @@ class BCTrainer(BaseTrainer):
 
         self.create_accelerator()
         self.set_seed()
-        self.setup_tokenizer()
+        # self.setup_tokenizer()
         self.get_raw_dataset()
         self.get_train_dataloader()
         self.get_inference_test_dataloader()
@@ -74,8 +74,6 @@ class BCTrainer(BaseTrainer):
         """
         Setup the tokenizer.
         """
-        self.agent.tokenizer.pad_token_id = 0
-        self.agent.tokenizer.eos_token_id = 2
         self.accelerator.print(f"[Vocab size]: {len(self.agent.tokenizer)}")
         self.agent.model.resize_token_embeddings(len(self.agent.tokenizer))
 
@@ -103,10 +101,7 @@ class BCTrainer(BaseTrainer):
 
         def tokenize_fn(batch, args, tokenizer):
             # tokenizer.chat_template = "{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\\n' + system_message + '\\n<</SYS>>\\n\\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ bos_token + '[INST] ' + content | trim + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content | trim + ' ' + eos_token }}{% endif %}{% endfor %}"
-            assert tokenizer.eos_token_id is not None, (
-                tokenizer.eos_token_id,
-                tokenizer.eos_token,
-            )
+            
             new_batch = defaultdict(list)
             all_keys = list(batch.keys())
             for item_values in zip(*(batch[k] for k in all_keys)):
@@ -115,38 +110,46 @@ class BCTrainer(BaseTrainer):
 
                 input_ids = []
                 labels = []
+                
+                for i, message in enumerate(conversations):
+                    text = '<|im_start|>' + message["role"] + '\n' + message['content'] + '<|im_end|>' + '\n'
+                    input_encode = tokenizer.encode(text, add_special_tokens=False)
+                    
+                    if message["role"] == "assistant" and i>1:
+                        if message['reasoning_content']:
+                            text_temp = '<|im_start|>' + message["role"] + '\n<think>\n' + message['reasoning_content'].strip('\n') + '\n</think>\n\n' + message['content'].lstrip('\n') + '<|im_end|>\n'
+                            input_encode_temp = tokenizer.encode(text_temp, add_special_tokens=False)
+                            attention_mask = [1] * len(input_ids + input_encode_temp)
+                            
+                            ##
+                            new_batch["input_ids"].append(input_ids + input_encode_temp)
+                            new_batch["labels"].append(labels + input_encode_temp)
+                            new_batch["attention_mask"].append(attention_mask)
+                            new_batch["item_id"].append(item_id)
+                            new_batch["input_ids_max_length"].append(len(input_ids))
 
-                for message in conversations:
-                    if message["from"] == "human":
-                        text = f"<s>[INST] {message['value']} [/INST]"
-                        input_encode = tokenizer.encode(text, add_special_tokens=False)
-                        input_ids.extend(input_encode)
-                        labels.extend([-100] * len(input_encode))
-                    else:
-                        # message["from"] == "gpt":
-                        # text = f" {message['value']}</s>"
-                        text = f" {message['value']}"
-                        input_encode = tokenizer.encode(text, add_special_tokens=False)
-                        input_encode += [tokenizer.eos_token_id]
+                            ##
+                            labels = [-100] * len(labels)
+                            
+                        ##
                         input_ids.extend(input_encode)
                         labels.extend(input_encode)
+                        
+                    else:
+                        input_ids.extend(input_encode)
+                        labels.extend([-100] * len(input_encode))
+                        
+                    all_text += text
+                    
+                    if conversations[-1]['role'] == 'assistant' and not conversations[-1]['reasoning_content']:
+                        attention_mask = [1] * len(input_ids)
+                        new_batch["input_ids"].append(input_ids)
+                        new_batch["labels"].append(labels)
+                        new_batch["attention_mask"].append(attention_mask)
+                        new_batch["item_id"].append(item_id)
+                        new_batch["input_ids_max_length"].append(len(input_ids))
 
                 attention_mask = [1] * len(input_ids)
-
-                # Truncation
-                input_ids_max_length = len(input_ids)
-                # assert input_ids_max_length <= args['max_input_length'], input_ids_max_length
-                input_ids = input_ids[: args["max_input_length"]]
-                labels = labels[: args["max_input_length"]]
-                attention_mask = attention_mask[: args["max_input_length"]]
-
-                ##
-                new_batch["input_ids"].append(input_ids)
-                new_batch["labels"].append(labels)
-                new_batch["attention_mask"].append(attention_mask)
-                ##
-                new_batch["item_id"].append(item_id)
-                new_batch["input_ids_max_length"].append(input_ids_max_length)
 
             return new_batch
 
@@ -230,6 +233,7 @@ class BCTrainer(BaseTrainer):
 
             self.inference_dataloader = DataLoader(
                 self.raw_dataset["inference"],
+                shuffle = True,
                 batch_size=self.args["eval_batch_size"],
                 num_workers=self.args["num_workers"],
                 pin_memory=True,
@@ -238,6 +242,7 @@ class BCTrainer(BaseTrainer):
 
             self.test_dataloader = DataLoader(
                 self.raw_dataset["test"],
+                shuffle = True,
                 batch_size=self.args["eval_batch_size"],
                 num_workers=self.args["num_workers"],
                 pin_memory=True,
@@ -253,7 +258,7 @@ class BCTrainer(BaseTrainer):
         Set the wandb.
         """
         # os.environ["WANDB_MODE"] = "offline"
-        if torch.distributed.get_rank() == 0 and self.args["wandb_log"]:
+        if self.args["wandb_log"]:
             wandb.init(
                 project=self.args["wandb_project"],
                 name=self.args["wandb_run_name"],
@@ -534,10 +539,13 @@ class BCTrainer(BaseTrainer):
 
             for index in batch["data_idxs"]:
                 for j in range(len(self.tasks)):
-                    if self.tasks[j].env_name == index["task"]:
+                    if self.tasks[j].env_name.lower() == index["task"]:
                         data_idxs[j].append(index["id"])
-
-            self.accelerator.print("==== Batch inference data idxs ====", data_idxs)
+            
+            batch_idxs = []
+            for idx in data_idxs:
+                batch_idxs += idx
+            self.accelerator.print("==== Batch inference data idxs ====", data_idxs, batch["data_idxs"], batch_idxs)
             with torch.no_grad():
                 exps = self.eval(
                     generation_config=GenerationConfig(
@@ -561,7 +569,7 @@ class BCTrainer(BaseTrainer):
                 cur_batch_success = torch.FloatTensor(
                     [1 if exp.reward == 1 else 0 for exp in exps.experiences]
                 ).to(self.accelerator.device)
-                cur_batch_data_idx = torch.tensor(data_idxs).to(self.accelerator.device)
+                cur_batch_data_idx = torch.tensor(batch_idxs).to(self.accelerator.device)
                 
                 # gather operation
                 all_device_batch_rewards = self.accelerator.gather(cur_batch_rewards)
@@ -583,7 +591,7 @@ class BCTrainer(BaseTrainer):
                             conversation = exp.conversation
                             cur_reward = exp.reward
                             cur_success = 1 if exp.reward == 1 else 0
-                            item_id = f"{self.args['task_name']}_{cur_idx}"
+                            item_id = f"{exp.env_name}_{cur_idx}"
                             f.write(
                                 {
                                     "conversations": conversation,
@@ -623,7 +631,7 @@ class BCTrainer(BaseTrainer):
         self.eval_test_dataloader(
             dataloader=self.inference_dataloader,
             do_sample=True,
-            temperature=1.2,
+            temperature=0.6,
             record_to_file=True,
         )
 
@@ -644,22 +652,22 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 @dataclass
 class TrainingArguments:
-    train_file: str = field(metadata={"help": "Training dataset."})
+    train_file: str = field(default="./train_1.json", metadata={"help": "Training dataset."})
     inference_file: str = field(
-        default="./data/train/train.json", metadata={"help": "Inference dataset."}
+        default="./test.json", metadata={"help": "Inference dataset."}
     )
-    test_file: str = field(default="./data/test/test.json", metadata={"help": "Test dataset."})
+    test_file: str = field(default="./test_1.json", metadata={"help": "Test dataset."})
     # model path
     model_train_path: str = field(
-        default="/mnt/petrelfs/share_data/llm_llama/llama2/llama-2-7b-chat-hf",
+        default="mrRL/Affine-ofdt-k4",
         metadata={"help": "Path of initial train model"},
     )
     model_save_path: str = field(
         default="outputs/model",
         metadata={"help": "Directory to save the trained model."},
     )
-    task_name_list: list = field(
-        default=[
+    task_name_list: list[str] = field(
+        default_factory=lambda: [
             "webshop",
             "alfworld",
             "sciworld",
@@ -668,7 +676,7 @@ class TrainingArguments:
         ], metadata={"help": "Task name for evaluation"}
     )
     batch_size: int = field(
-        default=4,
+        default=8,
         metadata={"help": "Batch size for training."},
     )
     eval_batch_size: int = field(
@@ -683,13 +691,13 @@ class TrainingArguments:
         default=1e-6, metadata={"help": "Weight decay for regularization."}
     )
     warmup_step: int = field(
-        default=0,
+        default=200,
         metadata={"help": "Number of warmup steps for learning rate scheduling."},
     )
     clip_grad_norm: float = field(
         default=1, metadata={"help": "Gradient clipping threshold."}
     )
-    gradient_accumulation_steps: int = field(default=1)
+    gradient_accumulation_steps: int = field(default=4)
     evaluating_epoch_freq: int = field(default=1)
     logging_epoch_freq: int = field(default=1)
     saving_epoch_freq: int = field(default=1)
@@ -699,7 +707,7 @@ class TrainingArguments:
 
     # environment
     max_round: int = field(
-        default=6,
+        default=20,
         metadata={"help": "Interaction rounds between agents and environment"},
     )
 
@@ -709,7 +717,7 @@ class TrainingArguments:
     wandb_run_name: str = field(default="behavioral_clone")
 
     # environment parameters
-    env_server_base: list = field(default=["http://127.0.0.1:36001" "http://127.0.0.1:36002" "http://127.0.0.1:36008" "http://127.0.0.1:36010"])
+    env_server_base_list: list[str] = field(default_factory=lambda:["http://127.0.0.1:36001", "http://127.0.0.1:36002", "http://127.0.0.1:36003", "http://127.0.0.1:36004", "http://127.0.0.1:36005"])
     data_len: int = field(default=200)
     timeout: int = field(default=2400)
 
@@ -717,7 +725,7 @@ class TrainingArguments:
 def main():
     parser = transformers.HfArgumentParser(TrainingArguments)
     (args,) = parser.parse_args_into_dataclasses()
-
+    print(args.batch_size)
     tokenizer = AutoTokenizer.from_pretrained(args.model_train_path)
     model = AutoModelForCausalLM.from_pretrained(
         args.model_train_path, low_cpu_mem_usage=True, torch_dtype=torch.bfloat16, device_map="auto"
@@ -725,7 +733,7 @@ def main():
 
     lora_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,   # you're using the model as an LM / policy
-        r=16,                           # rank of the low-rank matrices
+        r=8,                           # rank of the low-rank matrices
         lora_alpha=32,                  # scaling factor
         lora_dropout=0.05,               # dropout in the LoRA layers
         target_modules=["q_proj", "v_proj"]  # or other module names to adapt
@@ -733,7 +741,7 @@ def main():
 
     model.gradient_checkpointing_enable()
 
-    model = get_peft_model(model, lora_config)
+    # model = get_peft_model(model, lora_config)
 
     # task_name - task dict
     task_classes = {
@@ -746,7 +754,7 @@ def main():
 
     # select task according to the name
     task_class_list = []
-    for i in range(args.task_name_list):
+    for i in range(len(args.task_name_list)):
         task_class = task_classes.get(args.task_name_list[i].lower(), None) 
         if task_classes is None:
             raise ValueError(f"Unsupported task name: {args.task_name}")
@@ -765,10 +773,9 @@ def main():
         args,
     )
 
-    trainer.train()
+    trainer.eval_test_dataloader()
 
-    save_peft_model(model, "my_agent_lora")
-
+    model.save_pretrained("my_agent_lora")
 
 if __name__ == "__main__":
     main()

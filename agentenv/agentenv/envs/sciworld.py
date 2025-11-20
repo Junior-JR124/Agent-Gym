@@ -412,48 +412,48 @@ class SciWorldAdapter(BaseAdapter):
         ActionFormat.REACT:(
             ConversationMessage(
                 {
-                    "from": "human",
+                    "role": "user",
                     "loss": None,
-                    "value": 'You are an agent for science world. Every round I will give you an observation, you have to respond an action based on the observation to finish the given task. Here are the actions you may take: [{"action": "open/close OBJ", "description": "open/close a container"}, {"action": "de/activate OBJ", "description": "activate/deactivate a device"}, {"action": "connect OBJ to OBJ", "description": "connect electrical components"}, {"action": "disconnect OBJ", "description": "disconnect electrical components"}, {"action": "use OBJ [on OBJ]", "description": "use a device/item"}, {"action": "look around", "description": "describe the current room"}, {"action": "look at OBJ", "description": "describe an object in detail"}, {"action": "look in OBJ", "description": "describe a container\'s contents"}, {"action": "read OBJ", "description": "read a note or book"}, {"action": "move OBJ to OBJ", "description": "move an object to a container"}, {"action": "pick up OBJ", "description": "move an object to the inventory"}, {"action": "put down OBJ", "description": "drop an inventory item"}, {"action": "pour OBJ into OBJ", "description": "pour a liquid into a container"}, {"action": "dunk OBJ into OBJ", "description": "dunk a container into a liquid"}, {"action": "mix OBJ", "description": "chemically mix a container"}, {"action": "go to LOC", "description": "move to a new location"}, {"action": "eat OBJ", "description": "eat a food"}, {"action": "flush OBJ", "description": "flush a toilet"}, {"action": "focus on OBJ", "description": "signal intent on a task object"}, {"action": "wait", "description": "take no action for 10 iterations"}, {"action": "wait1", "description": "take no action for 1 iteration"}, {"action":"examine OBJ","description":"provides a description of the objects present on or in a receptacle."}, {"action": "task", "description": "describe current task"}, {"action": "inventory", "description": "list your inventory"}]\nYour response should use the following format:\nThought:\nyour thoughts.\n\nAction:\nyour next action',
+                    "content": 'You are an agent for science world. Every round I will give you an observation, you have to respond an action based on the observation to finish the given task. Here are the actions you may take: [{"action": "open/close OBJ", "description": "open/close a container"}, {"action": "de/activate OBJ", "description": "activate/deactivate a device"}, {"action": "connect OBJ to OBJ", "description": "connect electrical components"}, {"action": "disconnect OBJ", "description": "disconnect electrical components"}, {"action": "use OBJ [on OBJ]", "description": "use a device/item"}, {"action": "look around", "description": "describe the current room"}, {"action": "look at OBJ", "description": "describe an object in detail"}, {"action": "look in OBJ", "description": "describe a container\'s contents"}, {"action": "read OBJ", "description": "read a note or book"}, {"action": "move OBJ to OBJ", "description": "move an object to a container"}, {"action": "pick up OBJ", "description": "move an object to the inventory"}, {"action": "put down OBJ", "description": "drop an inventory item"}, {"action": "pour OBJ into OBJ", "description": "pour a liquid into a container"}, {"action": "dunk OBJ into OBJ", "description": "dunk a container into a liquid"}, {"action": "mix OBJ", "description": "chemically mix a container"}, {"action": "go to LOC", "description": "move to a new location"}, {"action": "eat OBJ", "description": "eat a food"}, {"action": "flush OBJ", "description": "flush a toilet"}, {"action": "focus on OBJ", "description": "signal intent on a task object"}, {"action": "wait", "description": "take no action for 10 iterations"}, {"action": "wait1", "description": "take no action for 1 iteration"}, {"action":"examine OBJ","description":"provides a description of the objects present on or in a receptacle."}, {"action": "task", "description": "describe current task"}, {"action": "inventory", "description": "list your inventory"}]\nYour response should use the following format:\nThought:\nyour thoughts.\n\nAction:\nyour next action',
                 }
             ),
             ConversationMessage(
                 {
-                    "from": "gpt",
+                    "role": "assistant",
                     "loss": False,
-                    "value": "OK. I'll follow your instructions and try my best to solve the task.",
+                    "content": "OK. I'll follow your instructions and try my best to solve the task.",
                 }
             ),
         ),
         ActionFormat.FUNCTION_CALLING: (
             ConversationMessage(
                 {
-                    "from": "human",
+                    "role": "user",
                     "loss": None,
-                    "value": f'You are an agent for science world. Every round I will give you an observation, you have to respond an action based on the observation to finish the given task. An action should be done by invoking an function.\n\n {format_function_call_prompt(SCIWORLD_FUNCTION_DESCRIPTION)}\n\n\nAfter your each turn, the environment will give you immediate feedback based on your taken actions. if the envrionment output \"No known action matches that input.\", that means the previous action is invalid and you should try more options.\n Reminder: \n1. the action must be chosen from the given functions. Any actions except provided available actions will be regarded as illegal. \n2. Think when necessary, try to act directly more in the process.',
+                    "content": f'You are an agent for science world. Every round I will give you an observation, you have to respond an action based on the observation to finish the given task. An action should be done by invoking an function.\n\n {format_function_call_prompt(SCIWORLD_FUNCTION_DESCRIPTION)}\n\n\nAfter your each turn, the environment will give you immediate feedback based on your taken actions. if the envrionment output \"No known action matches that input.\", that means the previous action is invalid and you should try more options.\n Reminder: \n1. the action must be chosen from the given functions. Any actions except provided available actions will be regarded as illegal. \n2. Think when necessary, try to act directly more in the process.',
                 }
             ),
             ConversationMessage(
                 {
-                    "from": "gpt",
+                    "role": "assistant",
                     "loss": False,
-                    "value": "OK. I'll follow your instructions and try my best to solve the task.",
+                    "content": "OK. I'll follow your instructions and try my best to solve the task.",
                 }
             ),
         ),
         ActionFormat.CODE_AS_ACTION: (
             ConversationMessage(
                 {
-                    "from": "human",
+                    "role": "user",
                     "loss": None,
-                    "value": f'You are an agent for science world. Every round I will give you an observation, you have to respond an action based on the observation to finish the given task. You can perform one of these actions by writing python code to invoke a function.\n\n {format_function_call_prompt(SCIWORLD_FUNCTION_DESCRIPTION)}\n\n\nAfter your each turn, the environment will give you immediate feedback based on your taken actions. if the envrionment output \"No known action matches that input.\", that means the previous action is invalid and you should try more options.\n Reminder: \n1. the action must be chosen from the given functions. The objects you choose must exist in the current room. Any actions except provided available actions will be regarded as illegal. \n2. Think when necessary, try to act directly more in the process.',
+                    "content": f'You are an agent for science world. Every round I will give you an observation, you have to respond an action based on the observation to finish the given task. You can perform one of these actions by writing python code to invoke a function.\n\n {format_function_call_prompt(SCIWORLD_FUNCTION_DESCRIPTION)}\n\n\nAfter your each turn, the environment will give you immediate feedback based on your taken actions. if the envrionment output \"No known action matches that input.\", that means the previous action is invalid and you should try more options.\n Reminder: \n1. the action must be chosen from the given functions. The objects you choose must exist in the current room. Any actions except provided available actions will be regarded as illegal. \n2. Think when necessary, try to act directly more in the process.',
                 }
             ),
             ConversationMessage(
                 {
-                    "from": "gpt",
+                    "role": "assistant",
                     "loss": False,
-                    "value": "OK. I'll follow your instructions and try my best to solve the task.",
+                    "content": "OK. I'll follow your instructions and try my best to solve the task.",
                 }
             ),
         )

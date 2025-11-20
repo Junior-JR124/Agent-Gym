@@ -80,30 +80,30 @@ Here is an example:
     {
         "conversations": [
             {
-                "from": "human",
+                "role": "user",
                 "loss": null,
-                "value": "You are web shopping.\nI will give you instructions about what to do.\nYou have to follow the instructions.\nEvery round I will give you an observation and a list of available actions, you have to respond an action based on the state and instruction.\nYou can use search action if search is available.\nYou can click one of the buttons in clickables.\nAn action should be of the following structure:\nsearch[keywords]\nclick[value]\nIf the action is not valid, perform nothing.\nKeywords in search are up to you, but the value in click must be a value in the list of available actions.\nRemember that your keywords in search should be carefully designed.\nYour response should use the following format:\n\nThought:\nI think ... \n\nAction: \nclick[something]"
+                "content": "You are web shopping.\nI will give you instructions about what to do.\nYou have to follow the instructions.\nEvery round I will give you an observation and a list of available actions, you have to respond an action based on the state and instruction.\nYou can use search action if search is available.\nYou can click one of the buttons in clickables.\nAn action should be of the following structure:\nsearch[keywords]\nclick[value]\nIf the action is not valid, perform nothing.\nKeywords in search are up to you, but the value in click must be a value in the list of available actions.\nRemember that your keywords in search should be carefully designed.\nYour response should use the following format:\n\nThought:\nI think ... \n\nAction: \nclick[something]"
             },
             {
-                "from": "gpt",
+                "role": "assistant",
                 "loss": false,
-                "value": "Ok."
+                "content": "Ok."
             },
             {
-                "from": "human",
+                "role": "user",
                 "loss": null,
-                "value": "WebShop [SEP] Instruction: [SEP] Find me men's shorts with elastic waist, classic fit, short sleeve for gym workout with color: navy, and size: x-large, and price lower than 50.00 dollars [SEP] Search"
+                "content": "WebShop [SEP] Instruction: [SEP] Find me men's shorts with elastic waist, classic fit, short sleeve for gym workout with color: navy, and size: x-large, and price lower than 50.00 dollars [SEP] Search"
             },
             {
-                "from": "gpt",
+                "role": "assistant",
                 "loss": true,
-                "value": "Thought:\nI think I should use the search bar to look for the shorts that match the given requirements.\n\nAction:\nsearch[men's shorts elastic waist classic fit short sleeve gym workout navy x-large price < 50.00]"
+                "content": "Thought:\nI think I should use the search bar to look for the shorts that match the given requirements.\n\nAction:\nsearch[men's shorts elastic waist classic fit short sleeve gym workout navy x-large price < 50.00]"
             },
 	...(more interactions)
            {
-                "from": "gpt",
+                "role": "assistant",
                 "loss": true,
-                "value": "Thought:\nI think I have found the right product that matches all the requirements. It's time to buy it.\n\nAction:\nclick[Buy Now]"
+                "content": "Thought:\nI think I have found the right product that matches all the requirements. It's time to buy it.\n\nAction:\nclick[Buy Now]"
             }
         ],
         "item_id": "webshop_6"

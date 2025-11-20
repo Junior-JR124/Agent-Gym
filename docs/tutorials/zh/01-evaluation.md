@@ -90,10 +90,10 @@ print("\n\n==== EXPERIENCES ====\n")
 for idx, exp in enumerate(exps.experiences[:3]):
     print(f"\n\n==== EXP {idx} ====\n")
     for message in exp.conversation:
-        if message["from"] == "gpt":
-            print(f"\n### Agent\n{message['value']}")
+        if message["role"] == "assistant":
+            print(f"\n### Agent\n{message['content']}")
         else:
-            print(f"\n### Env\n{message['value']}")
+            print(f"\n### Env\n{message['content']}")
 
 ```
 

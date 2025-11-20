@@ -13,13 +13,14 @@ import wandb
 from accelerate import Accelerator, InitProcessGroupKwargs
 from accelerate.utils import broadcast, gather_object
 from agentenv.controller.agent import Agent
-from agentenv.controller.task import BaseTask, GenerationConfig
+from agentenv.controller.task import BaseTask
 from agentenv.controller.utils import BaseTrainer
 from agentenv.trainer.utils import set_seed
 from datasets import Dataset, DatasetDict
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import AdamW, GenerationConfig, get_linear_schedule_with_warmup
+from torch.optim import AdamW
+from transformers import GenerationConfig, get_linear_schedule_with_warmup
 
 
 class AgentEvolTrainer(BaseTrainer):
@@ -110,14 +111,14 @@ class AgentEvolTrainer(BaseTrainer):
                 input_ids = []
                 labels = []
                 for message in conversations:
-                    if message["from"] == "human":
-                        text = f"<s>[INST] {message['value']} [/INST]"
+                    if message["role"] == "user":
+                        text = f" {message['content']}"
                         input_encode = tokenizer.encode(text, add_special_tokens=False)
                         input_ids.extend(input_encode)
                         labels.extend([-100] * len(input_encode))
                     else:
-                        # message["from"] == "gpt":
-                        text = f" {message['value']}"
+                        # message["role"] == "assistant":
+                        text = f" {message['content']}"
                         input_encode = tokenizer.encode(text, add_special_tokens=False)
                         input_encode += [tokenizer.eos_token_id]
                         input_ids.extend(input_encode)

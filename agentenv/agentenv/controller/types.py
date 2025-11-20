@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Optional, Sequence, TypedDict, List
 
 ConversationMessage = TypedDict(
-    "ConversationMessage", {"from": str, "loss": Optional[bool], "value": str}
+    "ConversationMessage", {"role": str, "loss": Optional[bool], "content": str}
 )
 
 APIConversationMessage = TypedDict(
@@ -52,6 +52,7 @@ class ExperienceOutput:
 class APIExperienceOutput:
     conversation: List[ConversationMessage]
     reward: float
+    env_name: str
 
 
 @dataclass

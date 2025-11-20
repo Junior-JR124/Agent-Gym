@@ -1,6 +1,6 @@
 from typing import Any, Callable, Mapping, Optional, Sequence, List, Union
 
-from . import APIAgent, BaseEnvClient
+from . import Agent, BaseEnvClient
 from .types import ConversationMessage, APIConversationMessage, ExperienceOutput, APIExperienceOutput
 
 
@@ -27,7 +27,7 @@ class BaseTask:
 
     def _generate_experience_one(
         self,
-        agent: APIAgent,
+        agent: Agent,
         client: BaseEnvClient,
         idx: int,
         generation_config = None,
@@ -38,20 +38,20 @@ class BaseTask:
         reward = 0.0
         done = False
         state = client.observe(env_id)
-        if isinstance(agent, APIAgent):
-            conversation = [APIConversationMessage({"role": "user", "content": client.conversation_start[0]["value"], "reasoning_content": None}),
-                            APIConversationMessage({"role": "assistant", "content": client.conversation_start[1]["value"], "reasoning_content": None}),
+        if isinstance(agent, Agent):
+            conversation = [APIConversationMessage({"role": "user", "content": client.conversation_start[0]["content"], "reasoning_content": None}),
+                            APIConversationMessage({"role": "assistant", "content": client.conversation_start[1]["content"], "reasoning_content": None}),
                             APIConversationMessage({"role": "user", "content": state, "reasoning_content": None})]
         else:
             raise NotImplementedError
         rounds = 0
 
         while not done:
-            if isinstance(agent, APIAgent):
-                generated_text, generated_reasoning_text = agent.generate(conversation)
+            if isinstance(agent, Agent):
+                generated_text = agent.generate(conversation, generation_config)
                 conversation.append(
                     APIConversationMessage(
-                        {"role": "assistant", "content": generated_text, "reasoning_content": generated_reasoning_text}
+                        {"role": "assistant", "content": generated_text}
                     )
                 )
             else:
@@ -64,7 +64,7 @@ class BaseTask:
                 step_output.done,
             )
 
-            if isinstance(agent, APIAgent):
+            if isinstance(agent, Agent):
                 conversation.append(
                     APIConversationMessage(
                         {"role": "user", "content": state, "reasoning_content": None}
@@ -79,17 +79,18 @@ class BaseTask:
         if hasattr(client, "close"):
             client.close(env_id)
 
-        if isinstance(agent, APIAgent):
+        if isinstance(agent, Agent):
             return APIExperienceOutput(
                 conversation=conversation,
                 reward=reward,
+                env_name = self.env_name
             )
         else:
             raise NotImplementedError
 
     def _generate_experience_batch(
         self,
-        agent: APIAgent,
+        agent: Agent,
         idxs: Sequence[int],
         generation_config = None,
         max_rounds: Optional[int] = None,
@@ -109,7 +110,7 @@ class BaseTask:
 
     def generate_experience(
         self,
-        agent: APIAgent,
+        agent: Agent,
         idxs: Union[Sequence[int], int],
         generation_config = None,
         max_rounds: Optional[int] = None,

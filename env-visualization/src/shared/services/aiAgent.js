@@ -111,7 +111,7 @@ class AIAgentService {
       const cleanedObservation = this.removePossibleDuplicateContent(initialObservation);
       
       conversation.push({
-        from: "human", 
+        from: "user", 
         loss: null,
         value: cleanedObservation
       })
@@ -246,7 +246,7 @@ class AIAgentService {
       // Add current observation to conversation if it's not the first round
       if (envState.rounds > 0) {
         conversation.push({
-          from: "human",
+          from: "user",
           loss: null,
           value: currentObservation
         })
@@ -276,7 +276,7 @@ class AIAgentService {
       
       // Add generated action to conversation
       conversation.push({
-        from: "gpt",
+        from: "assistant",
         loss: true,
         value: generatedText
       })
@@ -314,13 +314,13 @@ class AIAgentService {
     
     // Add fallback action to conversation
     conversation.push({
-      from: "human",
+      from: "user",
       loss: null,
       value: currentObservation
     })
     
     conversation.push({
-      from: "gpt", 
+      from: "assistant", 
       loss: true,
       value: `Fallback action: ${fallbackAction}`
     })
@@ -514,9 +514,9 @@ class AIAgentService {
     const messages = conversation.map(msg => {
       if (msg.from === "system") {
         return { role: "system", content: msg.value }
-      } else if (msg.from === "human") {
+      } else if (msg.from === "user") {
         return { role: "user", content: msg.value }
-      } else if (msg.from === "gpt") {
+      } else if (msg.from === "assistant") {
         return { role: "assistant", content: msg.value }
       }
       return { role: "user", content: msg.value }

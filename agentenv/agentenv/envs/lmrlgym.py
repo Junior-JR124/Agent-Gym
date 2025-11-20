@@ -18,13 +18,13 @@ from agentenv.controller.types import ConversationMessage, StepOutput
 class MazeEnvClient(BaseEnvClient):
     conversation_start = (
         ConversationMessage(
-            {"from": "human", "loss": None, "value": "You are an expert maze solver."}
+            {"role": "user", "loss": None, "content": "You are an expert maze solver."}
         ),
         ConversationMessage(
             {
-                "from": "gpt",
+                "role": "assistant",
                 "loss": False,
-                "value": "OK. I'll follow your instructions and try my best to solve the task.",
+                "content": "OK. I'll follow your instructions and try my best to solve the task.",
             }
         ),
     )
@@ -261,13 +261,13 @@ class MazeTask(BaseTask):
 class WordleEnvClient(BaseEnvClient):
     conversation_start = (
         ConversationMessage(
-            {"from": "human", "loss": None, "value": "You are an expert wordle player."}
+            {"role": "user", "loss": None, "content": "You are an expert wordle player."}
         ),
         ConversationMessage(
             {
-                "from": "gpt",
+                "role": "assistant",
                 "loss": False,
-                "value": "OK. I'll follow your instructions and try my best to solve the task.",
+                "content": "OK. I'll follow your instructions and try my best to solve the task.",
             }
         ),
     )

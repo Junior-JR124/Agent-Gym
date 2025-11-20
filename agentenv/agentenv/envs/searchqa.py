@@ -9,12 +9,12 @@ class SearchQAEnvClient(BaseEnvClient):
     conversation_start = (
             ConversationMessage(
                 {
-                    "from": "human",
+                    "role": "user",
                     "loss": None,
-                    "value":"""You must always reason inside <think>...</think> first; if you lack knowledge, issue a <search>...</search> and then stop; do not generate <information> or <answer> yet; wait for external input between <information>...</information> before continuing; resume only when new <information> is given; do not skip steps or anticipate answers early.""",
+                    "content":"""You must always reason inside <think>...</think> first; if you lack knowledge, issue a <search>...</search> and then stop; do not generate <information> or <answer> yet; wait for external input between <information>...</information> before continuing; resume only when new <information> is given; do not skip steps or anticipate answers early.""",
                 }
             ),
-            ConversationMessage({"from": "gpt", "loss": False, "value": "Ok."}),
+            ConversationMessage({"role": "assistant", "loss": False, "content": "Ok."}),
     )
 
     def __init__(

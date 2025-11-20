@@ -66,13 +66,13 @@ def tokenize_conversation(
         message,
         tokenizer,
     ):
-        if message["from"] == "human":
+        if message["role"] == "user":
             input_ids = tokenizer.encode(
-                f"<s>[INST] {message['value']} [/INST]", add_special_tokens=False
+                f"{message['content']}", add_special_tokens=False
             )
         else:
             input_ids = tokenizer.encode(
-                f"{message['value']}</s>", add_special_tokens=False
+                f"{message['content']}</s>", add_special_tokens=False
             )
         if message["loss"]:
             labels = list(input_ids)
@@ -102,8 +102,8 @@ def preprocess_multi_turn(
     prompt = source["prompt"]
     prompt = [
         {
-            "role": "user" if x["from"] == "human" else "assistant",
-            "content": x["value"],
+            "role": x["role"],
+            "content": x["content"],
         }
         for x in prompt
     ]

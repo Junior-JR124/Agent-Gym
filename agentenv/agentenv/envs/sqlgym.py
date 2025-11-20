@@ -11,12 +11,12 @@ class SqlGymEnvClient(BaseEnvClient):
     conversation_start = (
         ConversationMessage(
             {
-                "from": "human",
-                "value": "Given you a description of a SQlite database system, I will ask you a question, then you should help me operate the SQLite database with SQL to answer the question.\n\nYou have to explain the problem and your solution to me and write down your thoughts.\nAfter thinking and explaining thoroughly, you should give a SQL statement to solve the question.\n\nyour response should be like this:\nThought: Your thought here.\n\nAction: ```sql\nSELECT * FROM table WHERE condition;\n```\n\nYou MUST put SQL in markdown format without any other comments. Your SQL should be in one line. Every time you can only execute one SQL statement.",
+                "role": "user",
+                "content": "Given you a description of a SQlite database system, I will ask you a question, then you should help me operate the SQLite database with SQL to answer the question.\n\nYou have to explain the problem and your solution to me and write down your thoughts.\nAfter thinking and explaining thoroughly, you should give a SQL statement to solve the question.\n\nyour response should be like this:\nThought: Your thought here.\n\nAction: ```sql\nSELECT * FROM table WHERE condition;\n```\n\nYou MUST put SQL in markdown format without any other comments. Your SQL should be in one line. Every time you can only execute one SQL statement.",
                 "loss": None,
             }
         ),
-        ConversationMessage({"from": "gpt", "value": "Ok.", "loss": False}),
+        ConversationMessage({"role": "assistant", "content": "Ok.", "loss": False}),
     )
 
     def __init__(

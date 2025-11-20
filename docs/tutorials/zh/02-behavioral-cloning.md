@@ -14,24 +14,24 @@ AgentGYM 提供了各个环境的训练集/验证集 id 划分，你可以从 [H
         "item_id": "webshop_0",
         "conversations": [
             {
-                "from": "human",
+                "role": "user",
                 "loss": null,
-                "value": "任务的描述"
+                "content": "任务的描述"
             },
             {
-                "from": "gpt",
+                "role": "assistant",
                 "loss": false,
-                "value": "Ok."
+                "content": "Ok."
             },
             {
-                "from": "human",
+                "role": "user",
                 "loss": null,
-                "value": "环境输出"
+                "content": "环境输出"
             },
             {
-                "from": "gpt",
+                "role": "assistant",
                 "loss": true,
-                "value": "Thought: Agent 的思考\n\nAction: Agent 的动作"
+                "content": "Thought: Agent 的思考\n\nAction: Agent 的动作"
             },
             ...
         ],

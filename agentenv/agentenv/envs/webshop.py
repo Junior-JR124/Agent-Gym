@@ -55,32 +55,32 @@ class WebshopAdapter(BaseAdapter):
         ActionFormat.REACT: (
             ConversationMessage(
                 {
-                    "from": "human",
+                    "role": "user",
                     "loss": None,
-                    "value": "You are web shopping.\nI will give you instructions about what to do.\nYou have to follow the instructions.\nEvery round I will give you an observation and a list of available actions, you have to respond an action based on the state and instruction.\nYou can use search action if search is available.\nYou can click one of the buttons in clickables.\nAn action should be of the following structure:\nsearch[keywords]\nclick[value]\nIf the action is not valid, perform nothing.\nKeywords in search are up to you, but the value in click must be a value in the list of available actions.\nRemember that your keywords in search should be carefully designed.\nYour response should use the following format:\n\nThought:\nI think ... \n\nAction: \nclick[something]",
+                    "content": "You are web shopping.\nI will give you instructions about what to do.\nYou have to follow the instructions.\nEvery round I will give you an observation and a list of available actions, you have to respond an action based on the state and instruction.\nYou can use search action if search is available.\nYou can click one of the buttons in clickables.\nAn action should be of the following structure:\nsearch[keywords]\nclick[value]\nIf the action is not valid, perform nothing.\nKeywords in search are up to you, but the value in click must be a value in the list of available actions.\nRemember that your keywords in search should be carefully designed.\nYour response should use the following format:\n\nThought:\nI think ... \n\nAction: \nclick[something]",
                 }
             ),
-            ConversationMessage({"from": "gpt", "loss": False, "value": "Ok."}),
+            ConversationMessage({"role": "assistant", "loss": False, "content": "Ok."}),
         ),
         ActionFormat.FUNCTION_CALLING: (
             ConversationMessage(
                 {
-                    "from": "human",
+                    "role": "user",
                     "loss": None,
-                    "value": f"You are web shopping.\nI will give you instructions about what to do.\nYou have to follow the instructions.\nEvery round I will give you an observation and a list of available actions, you have to respond an action based on the state and instruction.\nYou can use search action if search is available.\nYou can click one of the buttons in clickables.\nAn action should be done by invoking a function.\n\n{format_function_call_prompt(WEBSHOP_FUNCTION_DESCRIPTION)}\n\n\nIf the page remains unchanged, it might indicate that your action is invalid.",
+                    "content": f"You are web shopping.\nI will give you instructions about what to do.\nYou have to follow the instructions.\nEvery round I will give you an observation and a list of available actions, you have to respond an action based on the state and instruction.\nYou can use search action if search is available.\nYou can click one of the buttons in clickables.\nAn action should be done by invoking a function.\n\n{format_function_call_prompt(WEBSHOP_FUNCTION_DESCRIPTION)}\n\n\nIf the page remains unchanged, it might indicate that your action is invalid.",
                 }
             ),
-            ConversationMessage({"from": "gpt", "loss": False, "value": "Ok."}),
+            ConversationMessage({"role": "assistant", "loss": False, "content": "Ok."}),
         ),
         ActionFormat.CODE_AS_ACTION: (
             ConversationMessage(
                 {
-                    "from": "human",
+                    "role": "user",
                     "loss": None,
-                    "value": f"You are web shopping.\nI will give you instructions about what to do.\nYou have to follow the instructions.\nEvery round I will give you an observation and a list of available actions, you have to respond an action based on the state and instruction.\nYou can use search action if search is available.\nYou can click one of the buttons in clickables.\nYou can perform one of these actions by writing python code to invoke a function.\n\n{format_code_as_action_prompt(WEBSHOP_FUNCTION_DESCRIPTION)}\n\n\nIf the page remains unchanged, it might indicate that your action is invalid.",
+                    "content": f"You are web shopping.\nI will give you instructions about what to do.\nYou have to follow the instructions.\nEvery round I will give you an observation and a list of available actions, you have to respond an action based on the state and instruction.\nYou can use search action if search is available.\nYou can click one of the buttons in clickables.\nYou can perform one of these actions by writing python code to invoke a function.\n\n{format_code_as_action_prompt(WEBSHOP_FUNCTION_DESCRIPTION)}\n\n\nIf the page remains unchanged, it might indicate that your action is invalid.",
                 }
             ),
-            ConversationMessage({"from": "gpt", "loss": False, "value": "Ok."}),
+            ConversationMessage({"role": "assistant", "loss": False, "content": "Ok."}),
         ),
     }
 

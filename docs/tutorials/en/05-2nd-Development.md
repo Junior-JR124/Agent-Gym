@@ -84,7 +84,7 @@ class TextCraftEnv(gym.Env[str, str]):
         #######################
         return self.observation
 
-    def render(self, mode="human"):
+    def render(self, mode="user"):
         # Inherit gym.Env method
         pass
 
@@ -241,16 +241,16 @@ class BabyAIEnvClient(BaseEnvClient):
     conversation_start = (
         ConversationMessage(
             {
-                "from": "human",
+                "role": "user",
                 "loss": None,
-                "value": 'You are an exploration master that wants to finish every goal you are given...',
+                "content": 'You are an exploration master that wants to finish every goal you are given...',
             }
         ),
         ConversationMessage(
             {
-                "from": "gpt",
+                "role": "assistant",
                 "loss": False,
-                "value": "OK. I'll follow your instructions and try my best to solve the task.",
+                "content": "OK. I'll follow your instructions and try my best to solve the task.",
             }
         ),
     )
