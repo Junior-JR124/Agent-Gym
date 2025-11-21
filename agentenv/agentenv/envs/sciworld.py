@@ -873,13 +873,13 @@ class SciworldEnvClient(BaseEnvClient):
             
         self.info[env_idx] = {
             "observation": response["observation"],
-            "reward": response["reward"],
+            "reward": response["reward"] / 100,
             "score": response["score"],
             "done": response["done"],
         }
         return StepOutput(
             state=response["observation"],
-            reward=response["score"],
+            reward=response["score"] / 100,
             done=response["done"],
         )
 
