@@ -147,13 +147,15 @@ class BaseAdapter:
         else:
             thought = thought[1].strip()
         action = _action.strip()
-        if invalid_format_flg:
-            print(
-                "The text is not in the correct format. Parsing result may not be accurate."
-            )
-            print("###RAW TEXT:\n", text)
-            print("\n###PARSED THOUGHT:\n", thought)
-            print("\n###PARSED ACTION:\n", action)
+        # if invalid_format_flg:
+            # print(
+            #     "The text is not in the correct format. Parsing result may not be accurate."
+            # )
+            # print("------------------------------------")
+            # print("###RAW TEXT:\n", text)
+            # print("------------------------------------")
+            # print("\n###PARSED THOUGHT:\n", thought)
+            # print("\n###PARSED ACTION:\n", action)
         return ActionWithTought(thought, action)
 
     @staticmethod
@@ -224,6 +226,7 @@ class BaseAgentEnvController:
             )
         elif isinstance(idxs[0], Sequence):
             for idx, task in enumerate(self.tasks):
+                print(task.env_name, idxs[idx])
                 experience += task.generate_experience(
                     self.agent,
                     idxs[idx],

@@ -163,3 +163,7 @@ cython_debug/
 
 # dataset
 *.json
+*.jsonl
+
+# model parameter
+*.safetensors

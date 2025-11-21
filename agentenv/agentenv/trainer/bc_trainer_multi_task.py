@@ -16,12 +16,16 @@ from agentenv.controller.agent import Agent
 from agentenv.controller.task import BaseTask
 from agentenv.controller.utils import BaseTrainer
 from agentenv.trainer.utils import set_seed
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict, load_dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch.optim import AdamW
 from transformers import GenerationConfig, get_linear_schedule_with_warmup
 from peft import LoraConfig, get_peft_model, TaskType
+
+def load_jsonl(path):
+    with open(path, "r") as f:
+        return [json.loads(line) for line in f if line.strip()]
 
 
 class BCTrainer(BaseTrainer):
@@ -82,7 +86,7 @@ class BCTrainer(BaseTrainer):
             self.raw_dataset = DatasetDict(
                 {
                     "train": Dataset.from_list(
-                        json.load(open(self.args["train_file"], "r"))
+                        load_jsonl(self.args["train_file"])
                     ),
                     "inference": Dataset.from_list(
                         json.load(open(self.args["inference_file"], "r"))
@@ -96,114 +100,141 @@ class BCTrainer(BaseTrainer):
 
     def get_train_dataloader(self):
         """
-        create train_dataset and train_dataloader
+        create train_dataset and train_dataloader using a for loop
         """
 
-        def tokenize_fn(batch, args, tokenizer):
-            # tokenizer.chat_template = "{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\\n' + system_message + '\\n<</SYS>>\\n\\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ bos_token + '[INST] ' + content | trim + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content | trim + ' ' + eos_token }}{% endif %}{% endfor %}"
+        def tokenize_item(item, tokenizer):
+            """Processes a single item (conversation) using the logic from tokenize_fn."""
             
-            new_batch = defaultdict(list)
-            all_keys = list(batch.keys())
-            for item_values in zip(*(batch[k] for k in all_keys)):
-                item = {k: item_values[i] for i, k in enumerate(all_keys)}
-                item_id, conversations = (item["item_id"], item["conversations"])
+            # The structure of the output is different here because we process one item at a time.
+            # It returns a list of dictionaries, as one conversation can generate multiple training examples (input_ids/labels pairs).
+            tokenized_examples = []
+            item_id, conversations = (item["item_id"], item["conversations"])
 
-                input_ids = []
-                labels = []
+            input_ids = []
+            labels = []
+
+            # 1. Handle user-ending conversation (truncate last user message if present)
+            if conversations and conversations[-1].get('role') == "user":
+                conversations = conversations[:-1]
+
+            # 2. Iterate through messages to build token sequences
+            for i, message in enumerate(conversations):
+                text = '<|im_start|>' + message["role"] + '\n' + message['content'] + '<|im_end|>' + '\n'
+                input_encode = tokenizer.encode(text, add_special_tokens=False)
                 
-                for i, message in enumerate(conversations):
-                    text = '<|im_start|>' + message["role"] + '\n' + message['content'] + '<|im_end|>' + '\n'
-                    input_encode = tokenizer.encode(text, add_special_tokens=False)
-                    
-                    if message["role"] == "assistant" and i>1:
-                        if message['reasoning_content']:
-                            text_temp = '<|im_start|>' + message["role"] + '\n<think>\n' + message['reasoning_content'].strip('\n') + '\n</think>\n\n' + message['content'].lstrip('\n') + '<|im_end|>\n'
-                            input_encode_temp = tokenizer.encode(text_temp, add_special_tokens=False)
-                            attention_mask = [1] * len(input_ids + input_encode_temp)
-                            
-                            ##
-                            new_batch["input_ids"].append(input_ids + input_encode_temp)
-                            new_batch["labels"].append(labels + input_encode_temp)
-                            new_batch["attention_mask"].append(attention_mask)
-                            new_batch["item_id"].append(item_id)
-                            new_batch["input_ids_max_length"].append(len(input_ids))
+                # Check for "assistant" role and reasoning content (CoT - Chain-of-Thought)
+                if message["role"] == "assistant" and i > 1:
+                    if message.get('reasoning_content'):
+                        # --- First Example (with Reasoning Content) ---
+                        # Create the temporary text including <think> tags
+                        text_temp = '<|im_start|>' + message["role"] + '\n<think>\n' + message.get('reasoning_content').strip('\n') + '\n</think>\n\n' + message['content'].lstrip('\n') + '<|im_end|>\n'
+                        input_encode_temp = tokenizer.encode(text_temp, add_special_tokens=False)
 
-                            ##
-                            labels = [-100] * len(labels)
-                            
-                        ##
-                        input_ids.extend(input_encode)
-                        labels.extend(input_encode)
+                        # Create a full example with reasoning
+                        full_input_ids = input_ids + input_encode_temp
+                        full_labels = labels + input_encode_temp # Labels include the new assistant turn (reasoning + response)
+                        attention_mask = [1] * len(full_input_ids)
                         
-                    else:
-                        input_ids.extend(input_encode)
-                        labels.extend([-100] * len(input_encode))
-                        
-                    all_text += text
+                        tokenized_examples.append({
+                            "input_ids": full_input_ids,
+                            "labels": full_labels,
+                            "attention_mask": attention_mask,
+                            "item_id": item_id,
+                            "input_ids_max_length": len(input_ids), # This is the length before the current assistant turn
+                        })
+
+                        # Reset labels for the *next* turn of the conversation to -100 (for the *previous* turns)
+                        # This ensures the model is only trained on the current assistant response *in the next step*.
+                        labels = [-100] * len(labels)
                     
-                    if conversations[-1]['role'] == 'assistant' and not conversations[-1]['reasoning_content']:
-                        attention_mask = [1] * len(input_ids)
-                        new_batch["input_ids"].append(input_ids)
-                        new_batch["labels"].append(labels)
-                        new_batch["attention_mask"].append(attention_mask)
-                        new_batch["item_id"].append(item_id)
-                        new_batch["input_ids_max_length"].append(len(input_ids))
+                    # --- Update cumulative input_ids and labels for the next turn ---
+                    # Append the standard assistant response (without explicit reasoning tags)
+                    # Note: In the original code, `labels` here are the original `labels` *from before* the reasoning-based example was created,
+                    # which were then set to -100 if the reasoning example was created. 
+                    # If `reasoning_content` was *not* present, `labels` retains the cumulative -100s for user turns and real tokens for assistant turns.
+                    input_ids.extend(input_encode)
+                    labels.extend(input_encode) # Standard behavior: train on the assistant response
+                    
+                else:
+                    # For all other roles (user, system) or the first two turns (i<=1)
+                    input_ids.extend(input_encode)
+                    labels.extend([-100] * len(input_encode)) # Do not train on user/system turns
 
-                attention_mask = [1] * len(input_ids)
+                # 3. Handle conversation-ending example (if last message is assistant AND no reasoning content)
+                if i == len(conversations) - 1 and conversations[-1]['role'] == 'assistant' and not conversations[-1].get('reasoning_content'):
+                    attention_mask = [1] * len(input_ids)
+                    tokenized_examples.append({
+                        "input_ids": input_ids,
+                        "labels": labels,
+                        "attention_mask": attention_mask,
+                        "item_id": item_id,
+                        "input_ids_max_length": len(input_ids), # Using current length as a placeholder; typically used to find the split point.
+                    })
+                    
+            return tokenized_examples
 
-            return new_batch
-
-        tokenized_dataset = DatasetDict(
-            {
-                "train": self.raw_dataset["train"].map(
-                    tokenize_fn,
-                    fn_kwargs={
-                        "args": self.args,
-                        "tokenizer": self.agent.tokenizer,
-                    },
-                    batched=True,
-                    remove_columns=self.raw_dataset["train"].column_names,
-                    num_proc=8,
-                    load_from_cache_file=False,
-                )
-            }
+        # --- Manual Loop Implementation (Replacing .map) with tqdm ---
+        all_tokenized_examples = []
+        
+        # --- Manual Loop Implementation (Replacing .map) ---
+        # 1. Wrap the iterable with tqdm
+        # Use 'desc' to label the progress bar
+        dataset_iterable = tqdm(
+            self.raw_dataset["train"], 
+            desc="Tokenizing Training Data", 
+            unit="examples"
         )
-        self.accelerator.print("Processed data:", tokenized_dataset)
-        for mode, dataset in tokenized_dataset.items():
-            self.accelerator.print(
-                f"\n{mode}_input_ids_max_length",
-                max(dataset["input_ids_max_length"]),
-            )
+        
+        for item in dataset_iterable:
+            tokenized_list = tokenize_item(item, self.agent.tokenizer)
+            all_tokenized_examples.extend(tokenized_list)
 
+        tokenized_dataset = DatasetDict({"train": all_tokenized_examples})
+
+        self.train_dataset = tokenized_dataset["train"]
+        # 5. Print statistics (optional but good practice)
+        # self.accelerator.print("Processed data size:", len(self.train_dataset))
+        # self.accelerator.print(
+        #     f"\ntrain_input_ids_max_length",
+        #     max(ex["input_ids_max_length"] for ex in self.train_dataset.data),
+        # )
+
+        # 6. Define collate_fn and DataLoader (remains the same)
         def collate_fn(batch, tokenizer):
             max_input_length = max([len(item["input_ids"]) for item in batch])
-            max_target_length = max([len(item["labels"]) for item in batch])
+            print(max_input_length)
+            # The original code used max_target_length, but with -100 padding, max_input_length can be used for labels length too
+            max_target_length = max([len(item["labels"]) for item in batch]) 
             input_ids = []
             attention_mask = []
             labels = []
 
             for item in batch:
+                # Pad input_ids with pad_token_id
                 input_ids.append(
                     item["input_ids"]
                     + [tokenizer.pad_token_id]
                     * (max_input_length - len(item["input_ids"]))
                 )
+                # Pad attention_mask with 0
                 attention_mask.append(
                     item["attention_mask"]
                     + [0] * (max_input_length - len(item["attention_mask"]))
                 )
+                # Pad labels with -100 (ignore index)
                 labels.append(
                     item["labels"] + [-100] * (max_target_length - len(item["labels"]))
                 )
 
             forward_kwargs = {
                 "input_ids": torch.LongTensor(input_ids),
-                "attention_mask": torch.BoolTensor(attention_mask),
+                # Note: The original code casts attention_mask to BoolTensor, which is fine
+                "attention_mask": torch.BoolTensor(attention_mask), 
                 "labels": torch.LongTensor(labels),
             }
             return {"forward_kwargs": forward_kwargs}
 
-        self.train_dataset = tokenized_dataset["train"]
         self.train_dataloader = DataLoader(
             tokenized_dataset["train"],
             shuffle=True,
@@ -302,21 +333,16 @@ class BCTrainer(BaseTrainer):
             if self.args["warmup_step"] is not None and self.args["warmup_step"] >= 0
             else int(0.1 * num_training_steps)
         )
+
+        trainable = [(n, p) for n, p in self.agent.model.named_parameters() if p.requires_grad]
+
         optimizer_grouped_parameters = [
             {
-                "params": [
-                    p
-                    for n, p in self.agent.model.named_parameters()
-                    if not any(nd in n for nd in ["bias", "LayerNorm.weight"])
-                ],
+                "params": [p for n, p in trainable if "bias" not in n and "LayerNorm.weight" not in n],
                 "weight_decay": self.args["weight_decay"],
             },
             {
-                "params": [
-                    p
-                    for n, p in self.agent.model.named_parameters()
-                    if any(nd in n for nd in ["bias", "LayerNorm.weight"])
-                ],
+                "params": [p for n, p in trainable if "bias" in n or "LayerNorm.weight" in n],
                 "weight_decay": 0.0,
             },
         ]
@@ -324,6 +350,9 @@ class BCTrainer(BaseTrainer):
         self.optimizer = AdamW(
             optimizer_grouped_parameters, lr=self.args["learning_rate"], eps=1e-8
         )
+        opt_param_count = sum(p.numel() for g in self.optimizer.param_groups for p in g["params"])
+        print(opt_param_count, "---------------------------------------")
+
         self.scheduler = get_linear_schedule_with_warmup(
             self.optimizer,
             num_warmup_steps=warmup_step,
@@ -368,7 +397,11 @@ class BCTrainer(BaseTrainer):
         ) as t:
             for idx, batch in t:
                 with self.accelerator.accumulate(self.agent.model):
+                    
+                    print("Allocated:", torch.cuda.memory_allocated() / 1024**2, "MB")
                     output = self.agent.model(**batch["forward_kwargs"])
+                    print("Allocated:", torch.cuda.memory_allocated() / 1024**2, "MB")
+                    print("------------------------------------------")
                     # train_data_idx = batch["item_id"]
                     # # Print train_data_idx
                     # self.accelerator.print("Train data idx:", train_data_idx)
@@ -549,7 +582,7 @@ class BCTrainer(BaseTrainer):
             with torch.no_grad():
                 exps = self.eval(
                     generation_config=GenerationConfig(
-                        max_length=4096,
+                        max_length=100000,
                         do_sample=do_sample,
                         temperature=temperature,
                         eos_token_id=self.agent.tokenizer.eos_token_id,
@@ -652,11 +685,11 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 @dataclass
 class TrainingArguments:
-    train_file: str = field(default="./train_1.json", metadata={"help": "Training dataset."})
+    train_file: str = field(default="./total.jsonl", metadata={"help": "Training dataset."})
     inference_file: str = field(
         default="./test.json", metadata={"help": "Inference dataset."}
     )
-    test_file: str = field(default="./test_1.json", metadata={"help": "Test dataset."})
+    test_file: str = field(default="./test_2.json", metadata={"help": "Test dataset."})
     # model path
     model_train_path: str = field(
         default="mrRL/Affine-ofdt-k4",
@@ -676,11 +709,11 @@ class TrainingArguments:
         ], metadata={"help": "Task name for evaluation"}
     )
     batch_size: int = field(
-        default=8,
+        default=2,
         metadata={"help": "Batch size for training."},
     )
     eval_batch_size: int = field(
-        default=8, metadata={"help": "Batch size for evaluation."}
+        default=10, metadata={"help": "Batch size for evaluation."}
     )
     n_epochs: int = field(default=40)
     num_workers: int = field(
@@ -741,7 +774,9 @@ def main():
 
     model.gradient_checkpointing_enable()
 
-    # model = get_peft_model(model, lora_config)
+    model = get_peft_model(model, lora_config)
+
+    model.config.use_cache = False
 
     # task_name - task dict
     task_classes = {
@@ -773,7 +808,7 @@ def main():
         args,
     )
 
-    trainer.eval_test_dataloader()
+    trainer.train()
 
     model.save_pretrained("my_agent_lora")
 

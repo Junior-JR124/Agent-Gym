@@ -6,10 +6,12 @@ Before running: You will have to have Java 1.8+ installed on your system (shippe
 conda create --name agentenv-sciworld python=3.8
 conda activate agentenv-sciworld
 pip install -e .
+sudo apt update  
+sudo apt install default-jre
 ```
 
 ## Launch
 
 ``` sh
-sciworld --host 0.0.0.0 --port 36001
+sciworld --host 0.0.0.0 --port 36003
 ```

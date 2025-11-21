@@ -11,5 +11,5 @@ pip install -e .
 ## Launch
 
 ``` sh
-babyai --host 0.0.0.0 --port 36001
+babyai --host 0.0.0.0 --port 36005
 ```

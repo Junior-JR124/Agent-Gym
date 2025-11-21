@@ -65,13 +65,12 @@ class Agent:
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
         chat_template: BaseChatTemplate | None = None,
-        inference_engine: InferenceEngine = "default",
     ) -> None:
         self.model = model
         self.tokenizer = tokenizer
         self.chat_template = chat_template or Llama2Template()
-        self.inference_engine = InferenceEngine(inference_engine)
         self._vllm = None
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     @torch.no_grad()
     def generate(
@@ -79,129 +78,36 @@ class Agent:
         input,
         generation_config: GenerationConfig,
         refresh_engine: bool = False,
-    ) -> torch.Tensor:
-        if isinstance(self.model, DistributedDataParallel):
-            model = self.model.module
-        else:
-            model = self.model
-        if self.inference_engine == InferenceEngine.VLLM:
-            os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
-            from vllm import LLM, SamplingParams, TokensPrompt
+    ):
+    
+        state = input[-1]["content"]
+        print("------------------------state------------------------")
+        print(state)
+        print(self.tokenizer(state, return_tensors="pt")["input_ids"].size(1))
+        print("------------------------state------------------------")
+        tokens = self.tokenizer.apply_chat_template(
+            input,
+            tokenize=True,
+            add_generation_prompt=False,
+            return_dict=True,
+            return_tensors="pt",
+            enable_thinking=True,  # Switches between thinking and non-thinking modes. Default is True.
+        ).to(self.model.device)
 
-            if not refresh_engine and self._vllm is not None:
-                llm = self._vllm
-            else:
-                print("Initializing vLLM engine.")
-                self._vllm = None
-                gc.collect()
-                if model.device != torch.cpu:
-                    model.to("cpu")
+        # Move *all* tensor values in inputs to GPU
+        # tokens = {k: v.to(self.device) for k, v in tokens.items()}
 
-                while shm_path := Path(
-                    f"/dev/shm/agentgym/inference_model_cache/{str(random.randint(0, 2**32))}"
-                ):
-                    if not shm_path.exists():
-                        break
-                model.save_pretrained(shm_path)
-                self.tokenizer.save_pretrained(shm_path)
-
-                if torch.cuda.is_available():
-                    num_devices = torch.cuda.device_count()
-                    torch.cuda.empty_cache()
-                elif torch_npu:
-                    num_devices = torch_npu.npu.device_count()
-                else:
-                    num_devices = 1
-
-                try:
-                    num_heads = self.model.config.num_attention_heads
-                    vocab_size = self.model.config.vocab_size
-                    n = math.gcd(num_heads, vocab_size)
-                except:
-                    n = 1
-
-                for tp_size in range(num_devices, 0, -1):
-                    if n % tp_size == 0:
-                        break
-                print(f"{num_devices=}, {n=}, {tp_size=}.")
-                try:
-                    llm = LLM(
-                        str(shm_path),
-                        tensor_parallel_size=tp_size,
-                        enable_prefix_caching=bool(not torch_npu),
-                        use_v2_block_manager=True,
-                        disable_custom_all_reduce=True,
-                        trust_remote_code=True,
-                    )
-                except Exception as e:
-                    print(e)
-                    print("Fail to create vLLM engine.")
-                    exit(-1)
-
-                self._vllm = llm
-                shutil.rmtree(shm_path)
-
-            INF = float("inf")
-            max_tokens = generation_config.max_new_tokens or INF
-            if generation_config.max_length:
-                max_length = generation_config.max_length - len(input_ids)
-            else:
-                max_length = INF
-            max_tokens = min(max_tokens, max_length)
-            if max_tokens == INF:
-                max_tokens = None
-
-            generation_config = {
-                "repetition_penalty": generation_config.repetition_penalty,
-                "temperature": generation_config.temperature,
-                "top_p": generation_config.top_p,
-                "top_k": generation_config.top_k,
-                "min_p": generation_config.min_p,
-                # "length_penalty": generation_config.length_penalty,
-                "early_stopping": generation_config.early_stopping,
-                "max_tokens": max_tokens,
-                "min_new_tokens": generation_config.min_new_tokens,
-                "stop_token_ids": [self.tokenizer.eos_token_id],
-            }
-            generation_config = {k: v for k, v in generation_config.items() if v}
-            output = llm.generate(
-                # prompts=TokensPrompt(prompt_token_ids=input_ids),
-                prompt_token_ids=input_ids,
-                sampling_params=SamplingParams.from_optional(
-                    **generation_config,
-                    detokenize=False,
-                ),
-                use_tqdm=False,
-            )
-
-            generated_tokens = []
-
-            for o in output:
-                generated_tokens.append(list(o.outputs[0].token_ids))
-
-        else:
-            tokens = self.tokenizer.apply_chat_template(
-                input,
-                tokenize=True,
-                add_generation_prompt=False,
-                return_dict=True,
-                return_tensors="pt",
-                enable_thinking=True,  # Switches between thinking and non-thinking modes. Default is True.
-            )
-
-            output = model.generate(
+        with torch.no_grad():
+            output = self.model.generate(
                 **tokens,
                 generation_config=generation_config,
             )
-            if isinstance(output, GenerateOutput):
-                output = output.sequences
-            generated_tokens = [
-                o[len(tokens["input_ids"][0]) :].cpu().numpy().tolist() for o in output
-            ]
-        print(input)
-        print("--------------------")
-        print(generated_tokens)
-        return generated_tokens
+            generated_text = self.tokenizer.decode(output[0][tokens["input_ids"].size(1):], skip_special_tokens=True)
+
+            print("--------------------")
+            print(tokens["input_ids"].size(1), output[0][tokens["input_ids"].size(1):].shape)
+            print(generated_text)
+            return generated_text
 
 
 class APIAgent:

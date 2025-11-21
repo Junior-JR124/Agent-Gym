@@ -12,5 +12,5 @@ pip install -e .
 ## Launch
 
 ``` sh
-textcraft --host 0.0.0.0 --port 36001
+textcraft --host 0.0.0.0 --port 36004
 ```

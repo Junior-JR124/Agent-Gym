@@ -49,6 +49,7 @@ class BaseTask:
         while not done:
             if isinstance(agent, Agent):
                 generated_text = agent.generate(conversation, generation_config)
+                print(idx)
                 conversation.append(
                     APIConversationMessage(
                         {"role": "assistant", "content": generated_text}

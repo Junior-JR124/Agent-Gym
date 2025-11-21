@@ -125,11 +125,11 @@ pip install agentenv
 #### from Source
 
 ```sh
-git clone --recursive https://github.com/WooooDyy/AgentGym
-cd ./AgentGym
-
-cd agentenv
+conda create --name agentenv-train python=3.10
+conda activate agentenv-train
 pip install -e .
+pip install jsonlines numpy torch wandb accelerate transformers openai datasets peft
+
 ```
 
 Depending on which environments you want to use, `cd` into the corresponding `agentenv-*` folder and follow the `README.md` inside.
